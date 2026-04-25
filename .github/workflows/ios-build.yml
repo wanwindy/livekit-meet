@@ -1,0 +1,75 @@
+name: iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ios-build.yml"
+      - "ios/**"
+      - "src/**"
+      - "index.tsx"
+      - "package.json"
+      - "yarn.lock"
+      - "Gemfile"
+      - "Gemfile.lock"
+  pull_request:
+    paths:
+      - ".github/workflows/ios-build.yml"
+      - "ios/**"
+      - "src/**"
+      - "index.tsx"
+      - "package.json"
+      - "yarn.lock"
+      - "Gemfile"
+      - "Gemfile.lock"
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    env:
+      NO_FLIPPER: "1"
+      RCT_NO_LAUNCH_PACKAGER: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - name: Install JS dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install CocoaPods
+        working-directory: ios
+        run: bundle exec pod install
+
+      - name: Build iOS simulator app
+        run: |
+          xcodebuild \
+            -workspace ios/LiveKitReactNativeMeet.xcworkspace \
+            -scheme LiveKitReactNativeMeet \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload iOS simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: ios/build/Build/Products/Debug-iphonesimulator/LiveKitReactNativeMeet.app
+          if-no-files-found: error
