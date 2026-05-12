@@ -1,6 +1,5 @@
-import { AudioSession } from '@livekit/react-native';
-import React from 'react';
-import { useEffect, useState } from 'react';
+import {AudioSession} from '@livekit/react-native';
+import React, {useEffect, useState} from 'react';
 import {
   FlatList,
   ListRenderItem,
@@ -9,96 +8,97 @@ import {
   Text,
   View,
 } from 'react-native';
+import {assuranceColors} from './brand';
 
 export type Props = {
   onSelect: () => void;
 };
-export const AudioOutputList = ({ onSelect }: Props) => {
+
+export const AudioOutputList = ({onSelect}: Props) => {
   const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
+
   useEffect(() => {
-    let loadAudioOutputs = async () => {
-      let outputs = await AudioSession.getAudioOutputs();
+    const loadAudioOutputs = async () => {
+      const outputs = await AudioSession.getAudioOutputs();
       setAudioOutputs(outputs);
     };
+
     loadAudioOutputs();
-    return () => {};
   }, []);
 
-  let selectOutput = async (deviceId: string) => {
+  const selectOutput = async (deviceId: string) => {
     await AudioSession.selectAudioOutput(deviceId);
     onSelect();
   };
-  let renderAudioOutput: ListRenderItem<string> = ({ item }) => {
+
+  const renderAudioOutput: ListRenderItem<string> = ({item}) => {
     return (
       <Pressable
-        onPress={() => {
-          selectOutput(item);
-        }}
-      >
-        <View style={styles.spacer} />
-        <Text style={styles.itemTextStyle}>{item}</Text>
-        <View style={styles.spacer} />
+        onPress={() => selectOutput(item)}
+        style={({pressed}) => [styles.item, pressed && styles.itemPressed]}>
+        <Text style={styles.itemText}>{item}</Text>
       </Pressable>
     );
   };
+
   return (
-    <View>
-      <Text style={styles.titleTextStyle}>{'Select Audio Output'}</Text>
-      <View style={styles.spacer} />
-      <FlatList
-        data={audioOutputs}
-        renderItem={renderAudioOutput}
-        keyExtractor={(item) => item}
-      />
+    <View style={styles.container}>
+      {audioOutputs.length > 0 ? (
+        <FlatList
+          data={audioOutputs}
+          renderItem={renderAudioOutput}
+          keyExtractor={item => item}
+          scrollEnabled={false}
+          contentContainerStyle={styles.list}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>未发现可切换的音频设备</Text>
+        </View>
+      )}
     </View>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-evenly',
-    marginVertical: 8,
+    marginTop: 20,
   },
-  icon: {
-    width: 32,
-    height: 32,
+  list: {
+    gap: 12,
   },
-  spacer: {
-    paddingTop: 10,
-  },
-  centeredView: {
-    flex: 1,
+  item: {
+    minHeight: 56,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: assuranceColors.borderSoft,
+    backgroundColor: assuranceColors.surfaceMuted,
     justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  itemPressed: {
+    transform: [{scale: 0.99}],
+    opacity: 0.92,
+  },
+  itemText: {
+    color: assuranceColors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyState: {
+    minHeight: 88,
+    borderRadius: 18,
+    backgroundColor: assuranceColors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: assuranceColors.borderSoft,
     alignItems: 'center',
-    marginTop: 22,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
   },
-  modalView: {
-    margin: 20,
-    backgroundColor: 'black',
-    borderRadius: 20,
-    padding: 35,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  titleTextStyle: {
-    color: 'white',
-    fontWeight: 'bold',
+  emptyText: {
+    color: assuranceColors.textSecondary,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
-    fontSize: 24,
-  },
-  itemTextStyle: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    fontSize: 20,
   },
 });
