@@ -1,0 +1,10 @@
+services:
+  livekit:
+    image: livekit/livekit-server:v1.11.0
+    container_name: livekit-media
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    network_mode: host
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+

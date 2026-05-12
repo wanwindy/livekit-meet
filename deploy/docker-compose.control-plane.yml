@@ -1,0 +1,28 @@
+services:
+  control-plane:
+    image: node:22-bookworm-slim
+    container_name: livekit-control-plane
+    working_dir: /app
+    command: sh -c "npm install --omit=dev && npm start"
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ../control-plane:/app
+      - control-plane-node-modules:/app/node_modules
+    ports:
+      - "127.0.0.1:17883:17883"
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: livekit-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - livekit-redis-data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+
+volumes:
+  livekit-redis-data:
+  control-plane-node-modules:

@@ -1,0 +1,17 @@
+{
+  "name": "fangxinban-livekit-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "control-plane",
+    "admin-web"
+  ],
+  "scripts": {
+    "test": "npm run test -w control-plane",
+    "build": "npm run build -w admin-web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+
