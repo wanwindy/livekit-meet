@@ -27,7 +27,6 @@ import {
   useRemoteParticipants,
   useRoomContext,
   useTracks,
-  useVisualStableUpdate,
 } from '@livekit/react-native';
 // @ts-ignore
 import {
@@ -298,11 +297,14 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
     () => getVisibleTracks({role, tracks}),
     [role, tracks],
   );
-  const stableTracks = useVisualStableUpdate(displayTracks, 5);
+  // Keep the highest-priority track in the stage immediately.
+  // useVisualStableUpdate intentionally preserves prior page order, which
+  // can leave a newly started screenshare stuck in the thumbnail strip.
+  const visibleTracks = displayTracks;
 
   const stageView =
-    stableTracks.length > 0 ? (
-      <ParticipantView trackRef={stableTracks[0]} style={styles.stage} />
+    visibleTracks.length > 0 ? (
+      <ParticipantView trackRef={visibleTracks[0]} style={styles.stage} />
     ) : (
       <View style={[styles.stage, styles.emptyStage]}>
         <Text style={styles.emptyStageTitle}>
@@ -326,7 +328,7 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
     item,
   }) => <ParticipantView trackRef={item} style={styles.otherParticipantView} />;
 
-  const otherTracks = stableTracks.slice(1);
+  const otherTracks = visibleTracks.slice(1);
   const otherParticipantsView = otherTracks.length > 0 && (
     <FlatList
       data={otherTracks}
