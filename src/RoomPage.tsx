@@ -116,9 +116,19 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
   useIOSAudioManagement(room);
 
   React.useEffect(() => {
-    startCallService();
+    startCallService().catch(error => {
+      Toast.show({
+        type: 'info',
+        text1: '后台保活未启动',
+        text2:
+          error instanceof Error
+            ? error.message
+            : '切换到后台后，会议音频可能会中断。',
+      });
+    });
+
     return () => {
-      stopCallService();
+      stopCallService().catch(() => undefined);
     };
   }, []);
 

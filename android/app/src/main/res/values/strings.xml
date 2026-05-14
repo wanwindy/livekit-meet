@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">放心办</string>
+    <string name="foreground_service_channel_name">会议后台服务</string>
+    <string name="foreground_service_channel_description">保持会议音频与视频连接</string>
 </resources>

@@ -1,9 +1,10 @@
-// Start a CallKit call on iOS.
-// This keeps the app alive in the background.
+// iOS keeps the audio session active in the background through
+// AudioSession/useIOSAudioManagement plus UIBackgroundModes=audio.
+// A more robust CallKit integration is still a native follow-up task.
 export async function startCallService() {
-  // TODO
+  return;
 }
 
 export async function stopCallService() {
-  // TODO
+  return;
 }

@@ -13,6 +13,7 @@ import com.facebook.react.flipper.ReactNativeFlipper
 import com.facebook.soloader.SoLoader
 import com.livekit.reactnative.LiveKitReactNative
 import com.livekit.reactnative.audio.AudioType
+import com.oney.WebRTCModule.WebRTCModuleOptions
 
 class MainApplication : Application(), ReactApplication {
 
@@ -36,7 +37,8 @@ class MainApplication : Application(), ReactApplication {
     get() = getDefaultReactHost(this.applicationContext, reactNativeHost)
 
   override fun onCreate() {
-    LiveKitReactNative.setup(this);
+    WebRTCModuleOptions.getInstance().enableMediaProjectionService = true
+    LiveKitReactNative.setup(this, AudioType.CommunicationAudioType())
     super.onCreate()
     SoLoader.init(this, false)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
