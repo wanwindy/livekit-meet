@@ -40,7 +40,7 @@ export const transaction = async callback => {
 };
 
 export const migrate = async () => {
-  const schemaPath = path.join(__dirname, '..', 'schema.sql');
+  const schemaPath = path.join(__dirname, 'schema.sql');
   const schema = await fs.readFile(schemaPath, 'utf8');
   const statements = schema
     .split(/;\s*$/m)
@@ -76,4 +76,3 @@ export const ensureBootstrapAdmin = async () => {
     {username, displayName, passwordHash},
   );
 };
-
