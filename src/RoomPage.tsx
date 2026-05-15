@@ -1,4 +1,5 @@
 import * as React from 'react';
+import type {NavigationAction} from '@react-navigation/native';
 import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
@@ -106,8 +107,11 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
   const [isCameraFrontFacing, setCameraFrontFacing] = React.useState(true);
   const [servicePromptVisible, setServicePromptVisible] = React.useState(false);
   const [isStartingService, setIsStartingService] = React.useState(false);
+  const [leavePromptVisible, setLeavePromptVisible] = React.useState(false);
   const autoShareAttemptedRef = React.useRef(false);
   const isStartingServiceRef = React.useRef(false);
+  const isLeavingRef = React.useRef(false);
+  const pendingLeaveActionRef = React.useRef<NavigationAction | null>(null);
   const room = useRoomContext();
   const connectionState = useConnectionState(room);
   const remoteParticipants = useRemoteParticipants();
@@ -274,6 +278,43 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
     }
   }, [isScreenShareEnabled]);
 
+  const openLeavePrompt = React.useCallback((action?: NavigationAction) => {
+    pendingLeaveActionRef.current = action ?? null;
+    setLeavePromptVisible(true);
+  }, []);
+
+  const cancelLeave = React.useCallback(() => {
+    pendingLeaveActionRef.current = null;
+    setLeavePromptVisible(false);
+  }, []);
+
+  const confirmLeave = React.useCallback(() => {
+    const action = pendingLeaveActionRef.current;
+    pendingLeaveActionRef.current = null;
+    setLeavePromptVisible(false);
+    isLeavingRef.current = true;
+
+    if (action != null) {
+      navigation.dispatch(action);
+      return;
+    }
+
+    navigation.pop();
+  }, [navigation]);
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', event => {
+      if (isLeavingRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      openLeavePrompt(event.data.action);
+    });
+
+    return unsubscribe;
+  }, [navigation, openLeavePrompt]);
+
   React.useEffect(() => {
     if (
       role !== 'participant' ||
@@ -346,6 +387,10 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
     requestParticipantScreenShare('manual').catch(() => undefined);
   };
 
+  const handleLeaveRequest = () => {
+    openLeavePrompt();
+  };
+
   return (
     <View style={styles.container}>
       {stageView}
@@ -410,9 +455,7 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
         onSimulate={scenario => {
           room.simulateScenario(scenario);
         }}
-        onDisconnectClick={() => {
-          navigation.pop();
-        }}
+        onDisconnectClick={handleLeaveRequest}
         style={isFullscreenScreenShare ? styles.controlsOverlay : undefined}
       />
       <ServiceStartDialog
@@ -423,9 +466,12 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
         }
         isStarting={isStartingService}
         onStart={handleStartService}
-        onLeave={() => {
-          navigation.pop();
-        }}
+        onLeave={handleLeaveRequest}
+      />
+      <LeaveConfirmDialog
+        visible={leavePromptVisible}
+        onCancel={cancelLeave}
+        onConfirm={confirmLeave}
       />
       {screenCapturePickerView}
     </View>
@@ -483,6 +529,47 @@ const ServiceStartDialog = ({
   );
 };
 
+type LeaveConfirmDialogProps = {
+  visible: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+const LeaveConfirmDialog = ({
+  visible,
+  onCancel,
+  onConfirm,
+}: LeaveConfirmDialogProps) => {
+  return (
+    <Modal animationType="fade" transparent={true} visible={visible}>
+      <View style={styles.leaveModalShell}>
+        <View style={styles.leaveCard}>
+          <Text style={styles.leaveTitle}>确认退出会议？</Text>
+          <Text style={styles.leaveText}>
+            返回上一页会立即离开当前会议，确认后才会退出。
+          </Text>
+          <Pressable
+            onPress={onConfirm}
+            style={({pressed}) => [
+              styles.leavePrimaryButton,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={styles.leavePrimaryText}>确认退出</Text>
+          </Pressable>
+          <Pressable
+            onPress={onCancel}
+            style={({pressed}) => [
+              styles.leaveSecondaryButton,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={styles.leaveSecondaryText}>继续会议</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -529,6 +616,63 @@ const styles = StyleSheet.create({
   otherParticipantView: {
     width: 150,
     height: 150,
+  },
+  leaveModalShell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(6,21,43,0.76)',
+  },
+  leaveCard: {
+    width: '100%',
+    borderRadius: 28,
+    paddingHorizontal: 26,
+    paddingVertical: 30,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+  },
+  leaveTitle: {
+    color: '#0F2748',
+    fontSize: 26,
+    lineHeight: 34,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  leaveText: {
+    color: '#627086',
+    fontSize: 15,
+    lineHeight: 24,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  leavePrimaryButton: {
+    width: '100%',
+    height: 58,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D34747',
+    marginTop: 26,
+  },
+  leavePrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  leaveSecondaryButton: {
+    width: '100%',
+    height: 52,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    backgroundColor: '#EEF3FB',
+  },
+  leaveSecondaryText: {
+    color: '#0F2748',
+    fontSize: 15,
+    fontWeight: '800',
   },
   serviceModalShell: {
     flex: 1,
