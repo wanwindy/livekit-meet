@@ -1,6 +1,6 @@
 import {Track} from 'livekit-client';
 import {describe, expect, it} from '@jest/globals';
-import {getVisibleTracks} from '../src/roomTracks';
+import {getVisibleTracks, isRemoteScreenShareTrack} from '../src/roomTracks';
 
 const createTrack = ({
   source,
@@ -70,5 +70,27 @@ describe('getVisibleTracks', () => {
 
     expect(visibleTracks[0].source).toBe(Track.Source.ScreenShare);
     expect(visibleTracks[0].participant.identity).toBe('guest-1');
+  });
+
+  it('detects remote screen share tracks', () => {
+    expect(
+      isRemoteScreenShareTrack(
+        createTrack({
+          source: Track.Source.ScreenShare,
+          isLocal: false,
+          identity: 'guest-1',
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      isRemoteScreenShareTrack(
+        createTrack({
+          source: Track.Source.ScreenShare,
+          isLocal: true,
+          identity: 'host-1',
+        }),
+      ),
+    ).toBe(false);
   });
 });

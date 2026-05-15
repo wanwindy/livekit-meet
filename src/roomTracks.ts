@@ -3,22 +3,22 @@ import {Track} from 'livekit-client';
 
 export type RoomRole = 'host' | 'participant';
 
+export const isRemoteScreenShareTrack = (
+  trackRef?: TrackReferenceOrPlaceholder,
+) =>
+  !!trackRef &&
+  trackRef.source === Track.Source.ScreenShare &&
+  !trackRef.participant.isLocal;
+
 const getTrackPriority = (
   role: RoomRole,
   trackRef: TrackReferenceOrPlaceholder,
 ) => {
-  if (
-    role === 'host' &&
-    trackRef.source === Track.Source.ScreenShare &&
-    !trackRef.participant.isLocal
-  ) {
+  if (role === 'host' && isRemoteScreenShareTrack(trackRef)) {
     return 0;
   }
 
-  if (
-    trackRef.source === Track.Source.ScreenShare &&
-    !trackRef.participant.isLocal
-  ) {
+  if (isRemoteScreenShareTrack(trackRef)) {
     return 1;
   }
 

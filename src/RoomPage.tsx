@@ -44,7 +44,7 @@ import type {RootStackParamList} from './App';
 import {ParticipantView} from './ParticipantView';
 import {RoomControls} from './RoomControls';
 import {startCallService, stopCallService} from './callservice/CallService';
-import {getVisibleTracks} from './roomTracks';
+import {getVisibleTracks, isRemoteScreenShareTrack} from './roomTracks';
 
 import 'fastestsmallesttextencoderdecoder';
 
@@ -301,10 +301,13 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
   // useVisualStableUpdate intentionally preserves prior page order, which
   // can leave a newly started screenshare stuck in the thumbnail strip.
   const visibleTracks = displayTracks;
+  const stageTrack = visibleTracks[0];
+  const isFullscreenScreenShare =
+    isHost && isRemoteScreenShareTrack(stageTrack);
 
   const stageView =
     visibleTracks.length > 0 ? (
-      <ParticipantView trackRef={visibleTracks[0]} style={styles.stage} />
+      <ParticipantView trackRef={stageTrack} style={styles.stage} />
     ) : (
       <View style={[styles.stage, styles.emptyStage]}>
         <Text style={styles.emptyStageTitle}>
@@ -329,14 +332,15 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
   }) => <ParticipantView trackRef={item} style={styles.otherParticipantView} />;
 
   const otherTracks = visibleTracks.slice(1);
-  const otherParticipantsView = otherTracks.length > 0 && (
-    <FlatList
-      data={otherTracks}
-      renderItem={renderParticipant}
-      horizontal={true}
-      style={styles.otherParticipantsList}
-    />
-  );
+  const otherParticipantsView = !isFullscreenScreenShare &&
+    otherTracks.length > 0 && (
+      <FlatList
+        data={otherTracks}
+        renderItem={renderParticipant}
+        horizontal={true}
+        style={styles.otherParticipantsList}
+      />
+    );
 
   const handleStartService = () => {
     requestParticipantScreenShare('manual').catch(() => undefined);
@@ -409,6 +413,7 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
         onDisconnectClick={() => {
           navigation.pop();
         }}
+        style={isFullscreenScreenShare ? styles.controlsOverlay : undefined}
       />
       <ServiceStartDialog
         visible={
@@ -488,6 +493,13 @@ const styles = StyleSheet.create({
   stage: {
     flex: 1,
     width: '100%',
+  },
+  controlsOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
   },
   emptyStage: {
     alignItems: 'center',
