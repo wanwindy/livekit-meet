@@ -87,11 +87,15 @@ extension SocketConnection: StreamDelegate {
 private extension SocketConnection {
   func setupAddress() -> Bool {
     var addr = sockaddr_un()
+    let addressLength = MemoryLayout.size(ofValue: addr)
 
     guard filePath.count < MemoryLayout.size(ofValue: addr.sun_path) else {
       print("failure: fd path is too long")
       return false
     }
+
+    addr.sun_family = sa_family_t(AF_UNIX)
+    addr.sun_len = UInt8(addressLength)
 
     _ = withUnsafeMutablePointer(to: &addr.sun_path.0) { pointer in
       filePath.withCString { pathPointer in
@@ -108,9 +112,10 @@ private extension SocketConnection {
       return false
     }
 
+    let addressLength = socklen_t(MemoryLayout.size(ofValue: addr))
     let status = withUnsafePointer(to: &addr) { pointer in
       pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-        Darwin.connect(socketHandle, $0, socklen_t(MemoryLayout.size(ofValue: addr)))
+        Darwin.connect(socketHandle, $0, addressLength)
       }
     }
 
