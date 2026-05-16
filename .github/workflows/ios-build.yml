@@ -1,4 +1,4 @@
-name: iOS Build
+name: iOS TestFlight
 
 on:
   workflow_dispatch:
@@ -15,17 +15,10 @@ on:
       - "yarn.lock"
       - "Gemfile"
       - "Gemfile.lock"
-  pull_request:
-    paths:
-      - ".github/workflows/ios-build.yml"
-      - "ios/**"
-      - "src/**"
-      - "index.js"
-      - "index.tsx"
-      - "package.json"
-      - "yarn.lock"
-      - "Gemfile"
-      - "Gemfile.lock"
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-ios:
@@ -33,6 +26,26 @@ jobs:
     env:
       NO_FLIPPER: "1"
       RCT_NO_LAUNCH_PACKAGER: "1"
+      IOS_WORKSPACE: ios/LiveKitReactNativeMeet.xcworkspace
+      IOS_SCHEME: LiveKitReactNativeMeet
+      ARCHIVE_PATH: ${{ github.workspace }}/ios/build/LiveKitReactNativeMeet.xcarchive
+      EXPORT_PATH: ${{ github.workspace }}/ios/build/export
+      CERTIFICATE_PATH: ${{ runner.temp }}/build_certificate.p12
+      PROFILE_PATH: ${{ runner.temp }}/build.mobileprovision
+      PROFILE_PLIST_PATH: ${{ runner.temp }}/build_profile.plist
+      BROADCAST_PROFILE_PATH: ${{ runner.temp }}/broadcast.mobileprovision
+      BROADCAST_PROFILE_PLIST_PATH: ${{ runner.temp }}/broadcast_profile.plist
+      KEYCHAIN_PATH: ${{ runner.temp }}/build.keychain-db
+      EXPORT_OPTIONS_PLIST: ${{ runner.temp }}/ExportOptions.plist
+      APP_STORE_CONNECT_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+      APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+      BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+      BROADCAST_PROVISION_PROFILE_BASE64: ${{ secrets.BROADCAST_PROVISION_PROFILE_BASE64 }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -50,6 +63,32 @@ jobs:
           ruby-version: "3.2"
           bundler-cache: true
 
+      - name: Validate release configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for name in \
+            APP_STORE_CONNECT_API_ISSUER_ID \
+            APP_STORE_CONNECT_API_KEY_ID \
+            APP_STORE_CONNECT_API_KEY_BASE64 \
+            BUILD_CERTIFICATE_BASE64 \
+            BUILD_PROVISION_PROFILE_BASE64 \
+            BROADCAST_PROVISION_PROFILE_BASE64 \
+            KEYCHAIN_PASSWORD \
+            P12_PASSWORD
+          do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name is not configured"
+              missing=1
+            fi
+          done
+
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
       - name: Install JS dependencies
         run: yarn install --frozen-lockfile
 
@@ -57,21 +96,201 @@ jobs:
         working-directory: ios
         run: bundle exec pod install
 
-      - name: Build iOS simulator app
+      - name: Prepare signing assets
+        shell: bash
         run: |
-          xcodebuild \
-            -workspace ios/LiveKitReactNativeMeet.xcworkspace \
-            -scheme LiveKitReactNativeMeet \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ios/build \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+          set -euo pipefail
 
-      - name: Upload iOS simulator app
+          read_plist_value() {
+            local plist_path="$1"
+            local key_path="$2"
+            /usr/libexec/PlistBuddy -c "Print ${key_path}" "$plist_path" 2>/dev/null || true
+          }
+
+          decode_base64_to_file() {
+            local output_path="$1"
+            python3 -c 'import base64, pathlib, sys; pathlib.Path(sys.argv[1]).write_bytes(base64.b64decode(sys.stdin.read()))' "$output_path"
+          }
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | decode_base64_to_file "$CERTIFICATE_PATH"
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | decode_base64_to_file "$PROFILE_PATH"
+          echo -n "$BROADCAST_PROVISION_PROFILE_BASE64" | decode_base64_to_file "$BROADCAST_PROFILE_PATH"
+          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | decode_base64_to_file "$APP_STORE_CONNECT_KEY_PATH"
+
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST_PATH"
+          security cms -D -i "$BROADCAST_PROFILE_PATH" > "$BROADCAST_PROFILE_PLIST_PATH"
+
+          PROFILE_UUID=$(read_plist_value "$PROFILE_PLIST_PATH" "UUID")
+          PROFILE_NAME=$(read_plist_value "$PROFILE_PLIST_PATH" "Name")
+          TEAM_ID=$(read_plist_value "$PROFILE_PLIST_PATH" "TeamIdentifier:0")
+          APP_IDENTIFIER=$(read_plist_value "$PROFILE_PLIST_PATH" "Entitlements:application-identifier")
+          APP_GROUP_IDENTIFIER=$(read_plist_value "$PROFILE_PLIST_PATH" "Entitlements:com.apple.security.application-groups:0")
+          BUNDLE_ID="${APP_IDENTIFIER#${TEAM_ID}.}"
+
+          BROADCAST_PROFILE_UUID=$(read_plist_value "$BROADCAST_PROFILE_PLIST_PATH" "UUID")
+          BROADCAST_PROFILE_NAME=$(read_plist_value "$BROADCAST_PROFILE_PLIST_PATH" "Name")
+          BROADCAST_TEAM_ID=$(read_plist_value "$BROADCAST_PROFILE_PLIST_PATH" "TeamIdentifier:0")
+          BROADCAST_APP_IDENTIFIER=$(read_plist_value "$BROADCAST_PROFILE_PLIST_PATH" "Entitlements:application-identifier")
+          BROADCAST_APP_GROUP_IDENTIFIER=$(read_plist_value "$BROADCAST_PROFILE_PLIST_PATH" "Entitlements:com.apple.security.application-groups:0")
+          BROADCAST_BUNDLE_ID="${BROADCAST_APP_IDENTIFIER#${BROADCAST_TEAM_ID}.}"
+
+          BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          LOGIN_KEYCHAIN=$(security login-keychain | tr -d '"')
+
+          if [[ -z "$PROFILE_UUID" || -z "$PROFILE_NAME" || -z "$TEAM_ID" ]]; then
+            echo "::error::Failed to read signing metadata from app provisioning profile"
+            exit 1
+          fi
+
+          if [[ -z "$BROADCAST_PROFILE_UUID" || -z "$BROADCAST_PROFILE_NAME" || -z "$BROADCAST_TEAM_ID" ]]; then
+            echo "::error::Failed to read signing metadata from broadcast provisioning profile"
+            exit 1
+          fi
+
+          if [[ -z "$BUNDLE_ID" || "$BUNDLE_ID" == "$APP_IDENTIFIER" || "$BUNDLE_ID" == "*" ]]; then
+            echo "::error::App provisioning profile must contain an explicit app bundle identifier"
+            exit 1
+          fi
+
+          if [[ -z "$BROADCAST_BUNDLE_ID" || "$BROADCAST_BUNDLE_ID" == "$BROADCAST_APP_IDENTIFIER" || "$BROADCAST_BUNDLE_ID" == "*" ]]; then
+            echo "::error::Broadcast provisioning profile must contain an explicit app bundle identifier"
+            exit 1
+          fi
+
+          if [[ "$TEAM_ID" != "$BROADCAST_TEAM_ID" ]]; then
+            echo "::error::App and broadcast provisioning profiles must use the same Apple team"
+            exit 1
+          fi
+
+          if [[ -z "$APP_GROUP_IDENTIFIER" ]]; then
+            echo "::error::App provisioning profile is missing an application group entitlement"
+            exit 1
+          fi
+
+          if [[ -z "$BROADCAST_APP_GROUP_IDENTIFIER" || "$APP_GROUP_IDENTIFIER" != "$BROADCAST_APP_GROUP_IDENTIFIER" ]]; then
+            echo "::error::App and broadcast provisioning profiles must share the same application group entitlement"
+            exit 1
+          fi
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          cp "$BROADCAST_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$BROADCAST_PROFILE_UUID.mobileprovision"
+
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          cp "$APP_STORE_CONNECT_KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" "$LOGIN_KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          {
+            echo "PROFILE_UUID=$PROFILE_UUID"
+            echo "PROFILE_NAME=$PROFILE_NAME"
+            echo "BROADCAST_PROFILE_UUID=$BROADCAST_PROFILE_UUID"
+            echo "BROADCAST_PROFILE_NAME=$BROADCAST_PROFILE_NAME"
+            echo "TEAM_ID=$TEAM_ID"
+            echo "BUNDLE_ID=$BUNDLE_ID"
+            echo "BROADCAST_BUNDLE_ID=$BROADCAST_BUNDLE_ID"
+            echo "APP_GROUP_IDENTIFIER=$APP_GROUP_IDENTIFIER"
+            echo "BUILD_NUMBER=$BUILD_NUMBER"
+          } >> "$GITHUB_ENV"
+
+      - name: Create export options
+        shell: bash
+        run: |
+          cat > "$EXPORT_OPTIONS_PLIST" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>destination</key>
+            <string>export</string>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+              <key>${BROADCAST_BUNDLE_ID}</key>
+              <string>${BROADCAST_PROFILE_NAME}</string>
+            </dict>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Archive iOS app
+        shell: bash
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -workspace "$IOS_WORKSPACE" \
+            -scheme "$IOS_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$ARCHIVE_PATH" \
+            clean archive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            APP_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            APP_GROUP_IDENTIFIER="$APP_GROUP_IDENTIFIER" \
+            SCREENSHARE_EXTENSION_BUNDLE_IDENTIFIER="$BROADCAST_BUNDLE_ID" \
+            APP_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            BROADCAST_PROVISIONING_PROFILE_SPECIFIER="$BROADCAST_PROFILE_NAME" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Export IPA
+        shell: bash
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PLIST"
+
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-simulator-app
-          path: ios/build/Build/Products/Debug-iphonesimulator/LiveKitReactNativeMeet.app
+          name: ios-testflight-ipa
+          path: ${{ env.EXPORT_PATH }}/*.ipa
           if-no-files-found: error
+
+      - name: Upload to TestFlight
+        shell: bash
+        run: |
+          set -euo pipefail
+          IPA_PATH=$(find "$EXPORT_PATH" -maxdepth 1 -name '*.ipa' -print -quit)
+          if [[ -z "$IPA_PATH" ]]; then
+            echo "::error::No IPA found in $EXPORT_PATH"
+            exit 1
+          fi
+
+          xcrun altool \
+            --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_API_ISSUER_ID"
+
+      - name: Cleanup signing assets
+        if: always()
+        shell: bash
+        run: |
+          security delete-keychain "$KEYCHAIN_PATH" || true
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision" || true
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$BROADCAST_PROFILE_UUID.mobileprovision" || true
+          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8" || true
