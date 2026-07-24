@@ -5,6 +5,7 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 60000
+  allow_tcp_fallback: true
   use_external_ip: false
   node_ip: "{{NODE_IP}}"
 redis:
@@ -28,4 +29,5 @@ turn:
   udp_port: 3478
 logging:
   level: info
-
+prometheus:
+  port: 6789

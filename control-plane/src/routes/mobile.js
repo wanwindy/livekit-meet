@@ -3,6 +3,7 @@ import {bindDeviceIfAllowed, requireBoundDevice} from '../deviceService.js';
 import {query, queryOne} from '../db.js';
 import {signAccountToken, verifyPassword, requireAuth} from '../auth.js';
 import {writeAuditLog} from '../audit.js';
+import {config} from '../config.js';
 import {badRequest, forbidden, notFound, unauthorized} from '../httpError.js';
 import {
   createMeetingForHost,
@@ -166,7 +167,13 @@ mobileRouter.post('/meetings/join', async (req, res, next) => {
 
     const meeting = await findMeetingByNumber(meetingNumber);
     if (!meeting) {
-      throw notFound('会议不存在');
+      const legacyMeeting = await joinLegacyMeeting(req.body || {});
+      if (!legacyMeeting) {
+        throw notFound('会议不存在');
+      }
+
+      res.json(legacyMeeting);
+      return;
     }
 
     if (!['created', 'active'].includes(meeting.status)) {
@@ -204,3 +211,36 @@ const normalizeDevice = body => ({
   deviceName: String(body.deviceName || body.device_name || '').trim(),
   appVersion: String(body.appVersion || body.app_version || '').trim(),
 });
+
+const joinLegacyMeeting = async body => {
+  const baseUrl = config.legacyTokenServiceBaseUrl?.trim();
+  if (!baseUrl) {
+    return null;
+  }
+
+  const response = await fetch(`${baseUrl}/api/meetings/join`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      meetingNumber: String(body.meetingNumber || '').trim(),
+      displayName: String(body.displayName || '参会人').trim() || '参会人',
+    }),
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw badRequest(data?.message || '会议服务暂时不可用');
+  }
+
+  return {
+    meetingNumber: data.meetingNumber,
+    roomName: data.roomName,
+    serverUrl: data.serverUrl,
+    region: data.region,
+    token: data.token,
+  };
+};

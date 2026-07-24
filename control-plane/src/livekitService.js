@@ -66,7 +66,11 @@ export const listLiveKitNodes = async () => {
 export const selectNodeForMeeting = async ({preferredRegion, audienceRegion}) => {
   const desiredRegion = decidePreferredRegion({preferredRegion, audienceRegion});
   const nodes = await listLiveKitNodes();
-  const node = chooseNode({nodes, preferredRegion: desiredRegion});
+  const node = chooseNode({
+    nodes,
+    preferredRegion: desiredRegion,
+    staleAfterMs: config.livekit.healthCheck.staleAfterMs,
+  });
 
   if (!node) {
     throw new HttpError(503, '没有可用的会议节点', 'no_livekit_node_available');

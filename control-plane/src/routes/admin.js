@@ -410,6 +410,17 @@ const normalizeNodeInput = (body, creating) => {
     throw badRequest('节点状态不正确');
   }
 
+  if (input.signalUrl) {
+    try {
+      const url = new URL(input.signalUrl);
+      if (!['ws:', 'wss:'].includes(url.protocol) || url.username || url.password) {
+        throw new Error('invalid signal URL');
+      }
+    } catch {
+      throw badRequest('信令地址必须是有效的 ws:// 或 wss:// 地址');
+    }
+  }
+
   return input;
 };
 

@@ -19,6 +19,8 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   port: toInt(process.env.PORT, 17882),
   publicBaseUrl: process.env.PUBLIC_BASE_URL || 'http://127.0.0.1:17882',
+  legacyTokenServiceBaseUrl:
+    process.env.LEGACY_TOKEN_SERVICE_BASE_URL || 'http://127.0.0.1:17882',
   jwtSecret: process.env.JWT_SECRET || 'dev-only-change-me',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '12h',
   autoMigrate: toBool(process.env.AUTO_MIGRATE, false),
@@ -34,6 +36,19 @@ export const config = {
     apiKey: process.env.LIVEKIT_API_KEY || '',
     apiSecret: process.env.LIVEKIT_API_SECRET || '',
     defaultRegion: process.env.LIVEKIT_DEFAULT_REGION || 'hk',
+    healthCheck: {
+      enabled: toBool(process.env.LIVEKIT_NODE_HEALTH_ENABLED, true),
+      intervalMs: toInt(process.env.LIVEKIT_NODE_HEALTH_INTERVAL_MS, 30000),
+      timeoutMs: toInt(process.env.LIVEKIT_NODE_HEALTH_TIMEOUT_MS, 5000),
+      failureThreshold: toInt(
+        process.env.LIVEKIT_NODE_HEALTH_FAILURE_THRESHOLD,
+        3,
+      ),
+      staleAfterMs: toInt(
+        process.env.LIVEKIT_NODE_HEALTH_STALE_AFTER_MS,
+        90000,
+      ),
+    },
     regionSignals: {
       hk: process.env.LIVEKIT_SIGNAL_HK || 'wss://fangxinbanmeet.com',
       sg: process.env.LIVEKIT_SIGNAL_SG || '',
@@ -48,4 +63,3 @@ export const config = {
 };
 
 export const isProduction = config.env === 'production';
-

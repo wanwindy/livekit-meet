@@ -35,7 +35,9 @@ const api = async (path, options = {}) => {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || '请求失败');
+    const error = new Error(data.message || '请求失败');
+    error.status = response.status;
+    throw error;
   }
 
   return data;
@@ -72,6 +74,27 @@ function App() {
 
   const isLoggedIn = Boolean(token);
 
+  const clearSession = nextMessage => {
+    localStorage.removeItem(TOKEN_KEY);
+    setToken('');
+    setSelectedAccount(null);
+    setDevices([]);
+    setAccounts([]);
+    setMeetings([]);
+    setNodes([]);
+    setAuditLogs([]);
+    setMessage(nextMessage || '');
+  };
+
+  const handleAppError = error => {
+    if (error?.status === 401) {
+      clearSession('登录已失效，请重新登录');
+      return;
+    }
+
+    setMessage(error?.message || '请求失败');
+  };
+
   const selectedAccountTitle = useMemo(() => {
     if (!selectedAccount) {
       return '选择账号查看设备';
@@ -94,7 +117,7 @@ function App() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      loadAll().catch(error => setMessage(error.message));
+      loadAll().catch(handleAppError);
     }
   }, [isLoggedIn]);
 
@@ -114,10 +137,7 @@ function App() {
   };
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    setToken('');
-    setSelectedAccount(null);
-    setDevices([]);
+    clearSession('');
   };
 
   const createAccount = async event => {
@@ -221,7 +241,7 @@ function App() {
       const result = await action();
       setMessage(result);
     } catch (error) {
-      setMessage(error.message);
+      handleAppError(error);
     }
   };
 
@@ -287,7 +307,7 @@ function App() {
             <h1>管理控制台</h1>
             <p>香港优先，Singapore 备用，设备绑定受控</p>
           </div>
-          <button className="secondary-action" onClick={() => loadAll().catch(error => setMessage(error.message))}>
+          <button className="secondary-action" onClick={() => loadAll().catch(handleAppError)}>
             <RefreshCw size={17} />
             刷新
           </button>
@@ -304,7 +324,7 @@ function App() {
             <div className="search-box">
               <Search size={17} />
               <input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索账号" />
-              <button onClick={() => loadAll().catch(error => setMessage(error.message))}>查询</button>
+              <button onClick={() => loadAll().catch(handleAppError)}>查询</button>
             </div>
           </div>
 
@@ -549,4 +569,3 @@ const regionLabel = region => ({hk: '香港', sg: '新加坡', cn: '内地'})[re
 const formatDate = value => (value ? new Date(value).toLocaleString('zh-CN') : '-');
 
 createRoot(document.getElementById('root')).render(<App />);
-

@@ -6,7 +6,7 @@ server {
   ssl_certificate_key {{TLS_PRIVKEY}};
 
   location / {
-    proxy_pass http://127.0.0.1:17882;
+    proxy_pass http://127.0.0.1:17883;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -48,4 +48,3 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 }
-

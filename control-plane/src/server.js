@@ -7,6 +7,7 @@ import {mobileRouter} from './routes/mobile.js';
 import {config, isProduction} from './config.js';
 import {ensureBootstrapAdmin, migrate, pool} from './db.js';
 import {HttpError} from './httpError.js';
+import {startNodeHealthMonitor} from './nodeHealth.js';
 
 export const createApp = () => {
   const app = express();
@@ -54,8 +55,10 @@ export const start = async () => {
   const server = app.listen(config.port, () => {
     console.log(`livekit-control-plane listening on ${config.port}`);
   });
+  const stopNodeHealthMonitor = startNodeHealthMonitor(config.livekit.healthCheck);
 
   const shutdown = async () => {
+    stopNodeHealthMonitor();
     server.close(async () => {
       await pool.end();
       process.exit(0);
@@ -72,4 +75,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   });
 }
-

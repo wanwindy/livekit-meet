@@ -13,7 +13,7 @@ Do not commit real passwords, LiveKit API secrets, Redis passwords, database pas
 | Server | Public IP | Initial role |
 | --- | --- | --- |
 | Hong Kong | `103.207.68.248` | Nginx, admin web, control API, MySQL, Redis, HK LiveKit |
-| Singapore | `45.77.250.78` | SG LiveKit, SG TURN |
+| Singapore | `139.180.140.32` | SG LiveKit, SG TURN |
 | Ningbo | `114.66.11.182` | Mainland probe/monitoring first; LiveKit/TURN only after compliance approval |
 
 ## Required DNS
@@ -41,6 +41,13 @@ Add Ningbo domains only after compliance approval.
 6. Deploy Singapore LiveKit with the same Redis endpoint and API key/secret.
 7. Test meeting creation with HK preferred, SG preferred, and HK offline fallback.
 8. Add TURN/TLS 443 after basic distributed routing is stable.
+
+## Transport And Monitoring
+
+- Keep Redis private: connect media nodes to the Hong Kong Redis address only over WireGuard or another private network. Do not publish port 6379 to the internet.
+- Keep the LiveKit HTTP root path (`/`) available through each regional signal domain. LiveKit returns `200 OK` there only when its node statistics are fresh; the control plane uses it for node health checks.
+- Allow TCP 443 for signalling, TCP 7881 for LiveKit fallback, UDP 50000-60000 for WebRTC media, and UDP 3478 for TURN. Restrict Prometheus port 6789 to the monitoring network.
+- TURN/TLS on port 443 needs either a separate public IP or SNI-aware L4 routing. Do not bind it directly to the same IP:443 used by Nginx.
 
 ## Control Plane
 
