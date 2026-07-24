@@ -33,6 +33,8 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+android/signing.properties
+android/signing-report*.log
 
 # node.js
 #

@@ -10,7 +10,12 @@ import Toast from 'react-native-toast-message';
 export type RootStackParamList = {
   HomePage: undefined;
   AccountPage: undefined;
-  RoomPage: {url: string; token: string; role: 'host' | 'participant'};
+  RoomPage: {
+    url: string;
+    token: string;
+    role: 'host' | 'participant';
+    meetingNumber: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

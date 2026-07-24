@@ -41,6 +41,7 @@ import {
   type TrackPublishOptions,
 } from 'livekit-client';
 import Toast from 'react-native-toast-message';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {RootStackParamList} from './App';
 import {ParticipantView} from './ParticipantView';
 import {RoomControls} from './RoomControls';
@@ -60,6 +61,8 @@ const HIGH_QUALITY_SCREEN_SHARE_CAPTURE: ScreenShareCaptureOptions = {
 
 const HIGH_QUALITY_SCREEN_SHARE_PUBLISH: TrackPublishOptions = {
   simulcast: false,
+  videoCodec: 'h264',
+  backupCodec: false,
   screenShareEncoding: {
     maxBitrate: 7_000_000,
     maxFramerate: 60,
@@ -70,7 +73,7 @@ export const RoomPage = ({
   navigation,
   route,
 }: NativeStackScreenProps<RootStackParamList, 'RoomPage'>) => {
-  const {url, token, role} = route.params;
+  const {url, token, role, meetingNumber} = route.params;
 
   React.useEffect(() => {
     const start = async () => {
@@ -93,7 +96,11 @@ export const RoomPage = ({
       }}
       audio={true}
       video={role === 'host'}>
-      <RoomView navigation={navigation} role={role} />
+      <RoomView
+        navigation={navigation}
+        role={role}
+        meetingNumber={meetingNumber}
+      />
     </LiveKitRoom>
   );
 };
@@ -101,9 +108,10 @@ export const RoomPage = ({
 type RoomViewProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoomPage'>;
   role: 'host' | 'participant';
+  meetingNumber: string;
 };
 
-const RoomView = ({navigation, role}: RoomViewProps) => {
+const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
   const [isCameraFrontFacing, setCameraFrontFacing] = React.useState(true);
   const [servicePromptVisible, setServicePromptVisible] = React.useState(false);
   const [isStartingService, setIsStartingService] = React.useState(false);
@@ -116,10 +124,11 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
   const connectionState = useConnectionState(room);
   const remoteParticipants = useRemoteParticipants();
   const isHost = role === 'host';
+  const insets = useSafeAreaInsets();
   useIOSAudioManagement(room);
 
   React.useEffect(() => {
-    startCallService().catch(error => {
+    startCallService().catch((error: unknown) => {
       Toast.show({
         type: 'info',
         text1: '后台保活未启动',
@@ -395,6 +404,14 @@ const RoomView = ({navigation, role}: RoomViewProps) => {
     <View style={styles.container}>
       {stageView}
       {otherParticipantsView}
+      <View
+        accessible={true}
+        accessibilityLabel={`会议号 ${meetingNumber}`}
+        style={[styles.meetingHeader, {top: insets.top + 8}]}
+        pointerEvents="none">
+        <Text style={styles.meetingHeaderLabel}>会议号</Text>
+        <Text style={styles.meetingHeaderNumber}>{meetingNumber}</Text>
+      </View>
       <RoomControls
         micEnabled={isMicrophoneEnabled}
         setMicEnabled={(enabled: boolean) => {
@@ -587,6 +604,30 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 10,
+  },
+  meetingHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 12,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  meetingHeaderLabel: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  meetingHeaderNumber: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   emptyStage: {
     alignItems: 'center',

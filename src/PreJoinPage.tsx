@@ -149,6 +149,7 @@ export const PreJoinPage = ({
         url: meeting.serverUrl,
         token: meeting.token,
         role: 'participant',
+        meetingNumber: meeting.meetingNumber,
       });
     } catch (error) {
       Toast.show({
@@ -172,6 +173,7 @@ export const PreJoinPage = ({
       url: meeting.serverUrl,
       token: meeting.token,
       role: 'host',
+      meetingNumber: meeting.meetingNumber,
     });
   };
 

@@ -27,11 +27,19 @@ final class SampleUploader {
     }
 
     isReady = false
-    dataToSend = prepare(sample: buffer)
-    byteIndex = 0
+    guard let preparedData = prepare(sample: buffer) else {
+      isReady = true
+      return false
+    }
 
     serialQueue.async { [weak self] in
-      self?.sendDataChunk()
+      guard let self else {
+        return
+      }
+
+      self.dataToSend = preparedData
+      self.byteIndex = 0
+      self.sendDataChunk()
     }
 
     return true
@@ -46,46 +54,45 @@ private extension SampleUploader {
 
     connection.streamHasSpaceAvailable = { [weak self] in
       self?.serialQueue.async {
-        if let didSend = self?.sendDataChunk() {
-          self?.isReady = !didSend
-        }
+        self?.sendDataChunk()
       }
     }
   }
 
-  @discardableResult
-  func sendDataChunk() -> Bool {
+  func sendDataChunk() {
     guard let dataToSend else {
-      return false
+      return
     }
 
     var bytesLeft = dataToSend.count - byteIndex
-    var length =
+    let maxLength =
       bytesLeft > SampleUploaderConstants.bufferMaxLength
       ? SampleUploaderConstants.bufferMaxLength
       : bytesLeft
 
-    length = dataToSend[byteIndex..<(byteIndex + length)].withUnsafeBytes {
+    let bytesWritten = dataToSend[byteIndex..<(byteIndex + maxLength)].withUnsafeBytes {
       guard let pointer = $0.bindMemory(to: UInt8.self).baseAddress else {
         return 0
       }
 
-      return connection.writeToStream(buffer: pointer, maxLength: length)
+      return connection.writeToStream(buffer: pointer, maxLength: maxLength)
     }
 
-    if length > 0 {
-      byteIndex += length
-      bytesLeft -= length
+    if bytesWritten > 0 {
+      byteIndex += bytesWritten
+      bytesLeft -= bytesWritten
 
       if bytesLeft == 0 {
         self.dataToSend = nil
         byteIndex = 0
+        isReady = true
       }
-    } else {
+    } else if bytesWritten < 0 {
       print("writeBufferToStream failure")
+      self.dataToSend = nil
+      byteIndex = 0
+      isReady = true
     }
-
-    return true
   }
 
   func prepare(sample buffer: CMSampleBuffer) -> Data? {
