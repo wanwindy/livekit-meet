@@ -687,7 +687,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APP_BUNDLE_IDENTIFIER = org.reactjs.native.example.LiveKitReactNativeMeet;
-				APP_MARKETING_VERSION = 100.0.5;
+				APP_MARKETING_VERSION = 100.0.6;
 				APP_GROUP_IDENTIFIER = "group.$(APP_BUNDLE_IDENTIFIER).screenshare";
 				APP_PROVISIONING_PROFILE_SPECIFIER = "";
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -772,7 +772,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APP_BUNDLE_IDENTIFIER = org.reactjs.native.example.LiveKitReactNativeMeet;
-				APP_MARKETING_VERSION = 100.0.5;
+				APP_MARKETING_VERSION = 100.0.6;
 				APP_GROUP_IDENTIFIER = "group.$(APP_BUNDLE_IDENTIFIER).screenshare";
 				APP_PROVISIONING_PROFILE_SPECIFIER = "";
 				ALWAYS_SEARCH_USER_PATHS = NO;

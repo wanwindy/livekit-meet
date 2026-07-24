@@ -23,15 +23,17 @@ Current note:
 
 ### iOS
 
-- Runner: `macos-14`
-- Output artifact: `ios-simulator-app`
-- Output file: `ios/build/Build/Products/Debug-iphonesimulator/LiveKitReactNativeMeet.app`
+- Runner: `macos-26`
+- Output artifact: `ios-testflight-ipa`
+- Output file: `ios/build/export/*.ipa`
 
 Current note:
 
-- The iOS workflow builds a simulator app with `CODE_SIGNING_ALLOWED=NO`.
-- This verifies that the app can compile in GitHub Actions.
-- It does not generate a signed IPA for App Store or TestFlight.
+- The workflow requires the Apple signing and App Store Connect secrets.
+- It archives a signed IPA and uploads it to TestFlight.
+
+For TestFlight uploads, run the workflow with a marketing version higher than
+the previous App Store Connect version. The current default is `100.0.6`.
 
 ## To Produce a Real iOS IPA Later
 
@@ -46,5 +48,4 @@ You will need:
 ## Current Recommendation
 
 - Use the Android workflow for internal test APKs.
-- Use the iOS workflow now as compile verification.
-- When you are ready for TestFlight or Ad Hoc distribution, add iOS signing and IPA export in a second step.
+- Use the iOS workflow to build and upload a signed TestFlight IPA.
