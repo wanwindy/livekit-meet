@@ -17,10 +17,9 @@ This project now includes GitHub Actions workflows for both Android and iOS.
 
 Current note:
 
-- The Android workflow now expects a real release keystore through repository secrets.
-- Required secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
-- Without those secrets, the workflow stops with a clear signing error instead of silently producing a debug-signed release APK.
-- Local signing instructions are documented in `docs/android-release-signing.md`.
+- The Android workflow uses the built-in debug keystore, so no repository signing secrets are required.
+- The artifact is suitable for internal testing only and cannot replace a production-signed APK.
+- Local release-signing instructions remain available in `docs/android-release-signing.md`.
 
 ### iOS
 
@@ -46,6 +45,6 @@ You will need:
 
 ## Current Recommendation
 
-- Use the Android workflow only after configuring release-signing secrets.
+- Use the Android workflow for internal test APKs.
 - Use the iOS workflow now as compile verification.
 - When you are ready for TestFlight or Ad Hoc distribution, add iOS signing and IPA export in a second step.

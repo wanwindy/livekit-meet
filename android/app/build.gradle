@@ -91,15 +91,7 @@ def hasReleaseSigning = [
     releaseKeyPassword,
 ].every { value -> value != null && !value.trim().isEmpty() }
 def releaseStoreFile = hasReleaseSigning ? rootProject.file(releaseStoreFilePath) : null
-def requestedTaskNames = gradle.startParameter.taskNames.collect { taskName -> taskName.toLowerCase() }
-def wantsReleaseBuild = requestedTaskNames.any { taskName -> taskName.contains("release") }
-
-if (wantsReleaseBuild && !hasReleaseSigning) {
-    throw new GradleException(
-        "Release signing is not configured. Copy android/signing.properties.example to android/signing.properties " +
-        "or set ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD."
-    )
-}
+def useDebugSigning = System.getenv("ANDROID_USE_DEBUG_KEYSTORE") == "true" || !hasReleaseSigning
 
 if (hasReleaseSigning && !releaseStoreFile.exists()) {
     throw new GradleException("Configured Android release keystore was not found: ${releaseStoreFile}")
@@ -152,7 +144,9 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            if (hasReleaseSigning) {
+            if (useDebugSigning) {
+                signingConfig signingConfigs.debug
+            } else {
                 signingConfig signingConfigs.release
             }
             minifyEnabled enableProguardInReleaseBuilds
