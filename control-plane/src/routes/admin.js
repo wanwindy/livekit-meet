@@ -62,6 +62,134 @@ adminRouter.get('/me', (req, res) => {
   res.json({account: toAccountDto(req.account)});
 });
 
+adminRouter.get('/overview', async (req, res, next) => {
+  try {
+    const days = normalizeOverviewDays(req.query.days);
+    const trendStartDays = days - 1;
+    const [
+      accounts,
+      devices,
+      meetings,
+      meetingParticipation,
+      nodes,
+      trendRows,
+      accountUsage,
+      recentActivity,
+    ] = await Promise.all([
+      query(
+        `select count(*) as total,
+                coalesce(sum(status = 'active'), 0) as active,
+                coalesce(sum(role = 'host'), 0) as hosts,
+                coalesce(sum(status in ('disabled', 'locked')), 0) as restricted
+         from accounts
+         where deleted_at is null`,
+      ),
+      query(
+        `select count(*) as total,
+                coalesce(sum(status = 'bound'), 0) as bound,
+                coalesce(sum(status = 'blocked'), 0) as blocked,
+                coalesce(sum(last_seen_at >= date_sub(now(), interval 1 day)), 0) as activeLast24Hours
+         from devices`,
+      ),
+      query(
+        `select count(*) as total,
+                coalesce(sum(status = 'active'), 0) as active,
+                coalesce(sum(status = 'created'), 0) as waiting,
+                coalesce(sum(created_at >= curdate()), 0) as createdToday,
+                coalesce(sum(created_at >= date_sub(curdate(), interval 6 day)), 0) as createdLast7Days
+         from meetings`,
+      ),
+      query(
+        `select count(*) as participantJoins,
+                coalesce(sum(created_at >= curdate()), 0) as participantJoinsToday,
+                coalesce(sum(created_at >= date_sub(curdate(), interval 6 day)), 0) as participantJoinsLast7Days,
+                count(distinct target_id) as joinedMeetingCount
+         from audit_logs
+         where action = 'meeting.join' and target_type = 'meeting'`,
+      ),
+      query(
+        `select count(*) as total,
+                coalesce(sum(status = 'healthy'), 0) as healthy,
+                coalesce(sum(status = 'degraded'), 0) as degraded,
+                coalesce(sum(status = 'offline'), 0) as offline,
+                coalesce(sum(status = 'draining'), 0) as draining
+         from livekit_nodes`,
+      ),
+      query(
+        `select date_format(created_at, '%Y-%m-%d') as day,
+                count(*) as meetingCount
+         from meetings
+         where created_at >= date_sub(curdate(), interval ${trendStartDays} day)
+         group by date_format(created_at, '%Y-%m-%d')
+         order by day`,
+      ),
+      query(
+        `select a.id, a.username, a.display_name as displayName, a.status,
+                coalesce(meeting_usage.meetingCount, 0) as meetingCount,
+                meeting_usage.lastMeetingAt,
+                coalesce(participant_usage.participantJoinCount, 0) as participantJoinCount,
+                participant_usage.lastParticipantJoinedAt,
+                coalesce(device_usage.boundDeviceCount, 0) as boundDeviceCount,
+                device_usage.lastSeenAt
+         from accounts a
+         left join (
+           select host_account_id, count(*) as meetingCount, max(created_at) as lastMeetingAt
+           from meetings
+           group by host_account_id
+         ) meeting_usage on meeting_usage.host_account_id = a.id
+          left join (
+            select account_id,
+                   sum(status = 'bound') as boundDeviceCount,
+                   max(last_seen_at) as lastSeenAt
+            from devices
+            group by account_id
+          ) device_usage on device_usage.account_id = a.id
+          left join (
+            select m.host_account_id,
+                   count(l.id) as participantJoinCount,
+                   max(l.created_at) as lastParticipantJoinedAt
+            from meetings m
+            left join audit_logs l
+              on l.target_type = 'meeting'
+             and l.action = 'meeting.join'
+             and l.target_id = m.meeting_number
+            group by m.host_account_id
+          ) participant_usage on participant_usage.host_account_id = a.id
+          where a.deleted_at is null
+          order by meetingCount desc, lastMeetingAt desc, a.id desc
+          limit 10`,
+      ),
+      query(
+        `select l.id, l.action, l.target_type as targetType, l.target_id as targetId,
+                l.created_at as createdAt, a.username as actorUsername,
+                a.display_name as actorDisplayName
+         from audit_logs l
+         left join accounts a on a.id = l.actor_account_id
+         order by l.id desc
+         limit 20`,
+      ),
+    ]);
+
+    res.json({
+      periodDays: days,
+      accounts: countSummary(accounts[0]),
+      devices: countSummary(devices[0]),
+      meetings: {...countSummary(meetings[0]), ...countSummary(meetingParticipation[0])},
+      nodes: countSummary(nodes[0]),
+      meetingTrend: buildMeetingTrend(trendRows, days),
+      accountUsage: accountUsage.map(row => ({
+        ...row,
+        meetingCount: Number(row.meetingCount || 0),
+        participantJoinCount: Number(row.participantJoinCount || 0),
+        boundDeviceCount: Number(row.boundDeviceCount || 0),
+      })),
+      recentActivity,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminRouter.get('/accounts', async (req, res, next) => {
   try {
     const keyword = `%${String(req.query.q || '').trim()}%`;
@@ -240,9 +368,19 @@ adminRouter.get('/meetings', async (req, res, next) => {
       `select m.id, m.meeting_number as meetingNumber, m.room_name as roomName,
               m.preferred_region as preferredRegion, m.livekit_url as livekitUrl,
               m.status, m.created_at as createdAt, m.ended_at as endedAt,
-              a.username as hostUsername, a.display_name as hostDisplayName
+              a.username as hostUsername, a.display_name as hostDisplayName,
+              coalesce(participation.participantJoinCount, 0) as participantJoinCount,
+              participation.lastParticipantJoinedAt
        from meetings m
        join accounts a on a.id = m.host_account_id
+       left join (
+         select target_id as meetingNumber,
+                count(*) as participantJoinCount,
+                max(created_at) as lastParticipantJoinedAt
+         from audit_logs
+         where action = 'meeting.join' and target_type = 'meeting'
+         group by target_id
+       ) participation on participation.meetingNumber = m.meeting_number
        order by m.id desc
        limit 200`,
     );
@@ -349,6 +487,32 @@ const toAccountDto = account => ({
   createdAt: account.created_at,
   updatedAt: account.updated_at,
 });
+
+export const normalizeOverviewDays = value => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    return 14;
+  }
+
+  return Math.max(7, Math.min(parsed, 30));
+};
+
+const countSummary = row =>
+  Object.fromEntries(Object.entries(row || {}).map(([key, value]) => [key, Number(value || 0)]));
+
+const buildMeetingTrend = (rows, days) => {
+  const countsByDay = new Map(rows.map(row => [row.day, Number(row.meetingCount || 0)]));
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() - days + 1);
+
+  return Array.from({length: days}, (_, index) => {
+    const day = new Date(start);
+    day.setUTCDate(start.getUTCDate() + index);
+    const date = day.toISOString().slice(0, 10);
+    return {date, meetingCount: countsByDay.get(date) || 0};
+  });
+};
 
 const normalizeAccountInput = (body, creating) => {
   const username = String(body.username || '').trim();

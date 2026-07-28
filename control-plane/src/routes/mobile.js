@@ -193,6 +193,14 @@ mobileRouter.post('/meetings/join', async (req, res, next) => {
       id: meeting.id,
     });
 
+    await writeAuditLog({
+      req,
+      action: 'meeting.join',
+      targetType: 'meeting',
+      targetId: meeting.meetingNumber,
+      detail: {role: 'participant', region: meeting.preferredRegion},
+    });
+
     res.json({
       meetingNumber: meeting.meetingNumber,
       roomName: meeting.roomName,
