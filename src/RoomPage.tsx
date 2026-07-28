@@ -46,6 +46,10 @@ import type {RootStackParamList} from './App';
 import {ParticipantView} from './ParticipantView';
 import {RoomControls} from './RoomControls';
 import {startCallService, stopCallService} from './callservice/CallService';
+import {
+  getMeetingParticipants,
+  getNewlyJoinedParticipants,
+} from './participantPresence';
 import {getVisibleTracks, isRemoteScreenShareTrack} from './roomTracks';
 
 import 'fastestsmallesttextencoderdecoder';
@@ -119,13 +123,56 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
   const autoShareAttemptedRef = React.useRef(false);
   const isStartingServiceRef = React.useRef(false);
   const isLeavingRef = React.useRef(false);
+  const knownParticipantIdentitiesRef = React.useRef<Set<string> | null>(null);
   const pendingLeaveActionRef = React.useRef<NavigationAction | null>(null);
   const room = useRoomContext();
   const connectionState = useConnectionState(room);
   const remoteParticipants = useRemoteParticipants();
   const isHost = role === 'host';
+  const isAndroidHost = Platform.OS === 'android' && isHost;
   const insets = useSafeAreaInsets();
   useIOSAudioManagement(room);
+
+  const meetingParticipants = React.useMemo(
+    () => getMeetingParticipants(remoteParticipants),
+    [remoteParticipants],
+  );
+
+  React.useEffect(() => {
+    if (!isAndroidHost || connectionState !== ConnectionState.Connected) {
+      knownParticipantIdentitiesRef.current = null;
+      return;
+    }
+
+    const currentIdentities = new Set(
+      meetingParticipants.map(participant => participant.identity),
+    );
+    const previousIdentities = knownParticipantIdentitiesRef.current;
+    knownParticipantIdentitiesRef.current = currentIdentities;
+
+    if (previousIdentities == null) {
+      return;
+    }
+
+    const joinedParticipants = getNewlyJoinedParticipants(
+      previousIdentities,
+      meetingParticipants,
+    );
+    if (joinedParticipants.length === 0) {
+      return;
+    }
+
+    const firstParticipant = joinedParticipants[0];
+    const joinedLabel =
+      joinedParticipants.length === 1
+        ? firstParticipant.displayName
+        : `${firstParticipant.displayName} 等 ${joinedParticipants.length} 人`;
+    Toast.show({
+      type: 'success',
+      text1: `${joinedLabel} 已进入会议`,
+      text2: `当前已有 ${meetingParticipants.length} 位参会人`,
+    });
+  }, [connectionState, isAndroidHost, meetingParticipants]);
 
   React.useEffect(() => {
     startCallService().catch((error: unknown) => {
@@ -412,6 +459,26 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
         <Text style={styles.meetingHeaderLabel}>会议号</Text>
         <Text style={styles.meetingHeaderNumber}>{meetingNumber}</Text>
       </View>
+      {isAndroidHost ? (
+        <View
+          accessible={true}
+          accessibilityLabel={`已入会参会人 ${meetingParticipants.length} 人`}
+          pointerEvents="none"
+          style={[styles.participantStatus, {top: insets.top + 44}]}>
+          <View
+            style={[
+              styles.participantStatusDot,
+              meetingParticipants.length > 0 &&
+                styles.participantStatusDotActive,
+            ]}
+          />
+          <Text style={styles.participantStatusText}>
+            {meetingParticipants.length > 0
+              ? `已入会 ${meetingParticipants.length} 人`
+              : '等待参会人'}
+          </Text>
+        </View>
+      ) : null}
       <RoomControls
         micEnabled={isMicrophoneEnabled}
         setMicEnabled={(enabled: boolean) => {
@@ -628,6 +695,34 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '800',
     letterSpacing: 1.2,
+  },
+  participantStatus: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 12,
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(6,21,43,0.8)',
+  },
+  participantStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  participantStatusDotActive: {
+    backgroundColor: '#48C99A',
+  },
+  participantStatusText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
   emptyStage: {
     alignItems: 'center',
