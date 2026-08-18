@@ -50,7 +50,11 @@ import {
   getMeetingParticipants,
   getNewlyJoinedParticipants,
 } from './participantPresence';
-import {getVisibleTracks, isRemoteScreenShareTrack} from './roomTracks';
+import {
+  getStageTrackObjectFit,
+  getVisibleTracks,
+  isRemoteScreenShareTrack,
+} from './roomTracks';
 
 import 'fastestsmallesttextencoderdecoder';
 
@@ -404,7 +408,11 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
 
   const stageView =
     visibleTracks.length > 0 ? (
-      <ParticipantView trackRef={stageTrack} style={styles.stage} />
+      <ParticipantView
+        trackRef={stageTrack}
+        style={styles.stage}
+        objectFit={getStageTrackObjectFit(stageTrack)}
+      />
     ) : (
       <View style={[styles.stage, styles.emptyStage]}>
         <Text style={styles.emptyStageTitle}>

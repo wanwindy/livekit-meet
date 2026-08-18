@@ -10,6 +10,11 @@ export const isRemoteScreenShareTrack = (
   trackRef.source === Track.Source.ScreenShare &&
   !trackRef.participant.isLocal;
 
+export const getStageTrackObjectFit = (
+  trackRef?: TrackReferenceOrPlaceholder,
+): 'contain' | 'cover' =>
+  trackRef?.source === Track.Source.ScreenShare ? 'contain' : 'cover';
+
 const getTrackPriority = (
   role: RoomRole,
   trackRef: TrackReferenceOrPlaceholder,

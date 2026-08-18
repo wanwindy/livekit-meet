@@ -17,6 +17,7 @@ const cameraOffIcon = require('./icons/baseline_videocam_off_white_24dp.png');
 export type Props = {
   trackRef: TrackReferenceOrPlaceholder;
   style?: ViewStyle;
+  objectFit?: 'contain' | 'cover';
   zOrder?: number;
   mirror?: boolean;
 };
@@ -24,6 +25,7 @@ export type Props = {
 export const ParticipantView = ({
   style = {},
   trackRef,
+  objectFit,
   zOrder,
   mirror,
 }: Props) => {
@@ -42,6 +44,7 @@ export const ParticipantView = ({
         <VideoTrack
           style={styles.videoView}
           trackRef={trackRef}
+          objectFit={objectFit}
           zOrder={zOrder}
           mirror={mirror}
         />

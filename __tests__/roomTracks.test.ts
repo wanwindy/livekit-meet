@@ -1,6 +1,10 @@
 import {Track} from 'livekit-client';
 import {describe, expect, it} from '@jest/globals';
-import {getVisibleTracks, isRemoteScreenShareTrack} from '../src/roomTracks';
+import {
+  getStageTrackObjectFit,
+  getVisibleTracks,
+  isRemoteScreenShareTrack,
+} from '../src/roomTracks';
 
 const createTrack = ({
   source,
@@ -92,5 +96,27 @@ describe('getVisibleTracks', () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  it('keeps a screen share fully visible in the stage', () => {
+    expect(
+      getStageTrackObjectFit(
+        createTrack({
+          source: Track.Source.ScreenShare,
+          isLocal: false,
+          identity: 'guest-1',
+        }),
+      ),
+    ).toBe('contain');
+
+    expect(
+      getStageTrackObjectFit(
+        createTrack({
+          source: Track.Source.Camera,
+          isLocal: false,
+          identity: 'guest-1',
+        }),
+      ),
+    ).toBe('cover');
   });
 });
