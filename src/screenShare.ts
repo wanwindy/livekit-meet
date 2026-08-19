@@ -5,9 +5,9 @@ import type {
 
 export const MOBILE_SCREEN_SHARE_CAPTURE: ScreenShareCaptureOptions = {
   resolution: {
-    width: 1280,
-    height: 720,
-    frameRate: 15,
+    width: 1920,
+    height: 1080,
+    frameRate: 60,
   },
   contentHint: 'detail',
 };
@@ -17,8 +17,8 @@ export const MOBILE_SCREEN_SHARE_PUBLISH: TrackPublishOptions = {
   videoCodec: 'h264',
   backupCodec: false,
   screenShareEncoding: {
-    maxBitrate: 1_500_000,
-    maxFramerate: 15,
+    maxBitrate: 7_000_000,
+    maxFramerate: 60,
   },
 };
 

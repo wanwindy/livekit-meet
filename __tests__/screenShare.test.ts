@@ -7,18 +7,18 @@ import {
 } from '../src/screenShare';
 
 describe('mobile screen sharing', () => {
-  it('uses a mobile-safe capture and encoding profile', () => {
+  it('uses the high-quality screen capture and encoding profile', () => {
     expect(MOBILE_SCREEN_SHARE_CAPTURE.resolution).toEqual({
-      width: 1280,
-      height: 720,
-      frameRate: 15,
+      width: 1920,
+      height: 1080,
+      frameRate: 60,
     });
     expect(MOBILE_SCREEN_SHARE_PUBLISH).toMatchObject({
       videoCodec: 'h264',
       backupCodec: false,
       screenShareEncoding: {
-        maxBitrate: 1_500_000,
-        maxFramerate: 15,
+        maxBitrate: 7_000_000,
+        maxFramerate: 60,
       },
     });
   });

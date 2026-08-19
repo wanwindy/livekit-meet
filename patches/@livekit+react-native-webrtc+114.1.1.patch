@@ -21,9 +21,9 @@ diff --git a/node_modules/@livekit/react-native-webrtc/android/src/main/java/com
      private static final String TAG = ScreenCaptureController.class.getSimpleName();
 
 -    private static final int DEFAULT_FPS = 30;
-+    private static final int DEFAULT_FPS = 15;
++    private static final int DEFAULT_FPS = 60;
 +
-+    private static final int MAX_CAPTURE_LONG_EDGE = 1280;
++    private static final int MAX_CAPTURE_LONG_EDGE = 1920;
 
      private final Intent mediaProjectionPermissionResultData;
 
@@ -129,7 +129,7 @@ diff --git a/node_modules/@livekit/react-native-webrtc/android/src/main/java/com
 +        super.onCreate();
 +        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
 +        wakeLock = powerManager.newWakeLock(
-+                PowerManager.SCREEN_DIM_WAKE_LOCK,
++                PowerManager.PARTIAL_WAKE_LOCK,
 +                TAG + ":ScreenShare");
 +        wakeLock.setReferenceCounted(false);
 +        wakeLock.acquire(MAX_WAKE_LOCK_DURATION_MS);
@@ -148,3 +148,15 @@ diff --git a/node_modules/@livekit/react-native-webrtc/android/src/main/java/com
      public int onStartCommand(Intent intent, int flags, int startId) {
 
          Notification notification = MediaProjectionNotification.buildMediaProjectionNotification(this);
+@@ -75,6 +96,10 @@ public int onStartCommand(Intent intent, int flags, int startId) {
+
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
++            int serviceType = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION;
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
++                serviceType |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
++            }
++            startForeground(NOTIFICATION_ID, notification, serviceType);
+         } else {
+             startForeground(NOTIFICATION_ID, notification);
+         }
