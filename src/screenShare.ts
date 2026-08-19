@@ -15,7 +15,7 @@ export const MOBILE_SCREEN_SHARE_CAPTURE: ScreenShareCaptureOptions = {
 export const MOBILE_SCREEN_SHARE_PUBLISH: TrackPublishOptions = {
   simulcast: false,
   videoCodec: 'h264',
-  backupCodec: true,
+  backupCodec: false,
   screenShareEncoding: {
     maxBitrate: 1_500_000,
     maxFramerate: 15,

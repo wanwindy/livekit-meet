@@ -15,7 +15,7 @@ describe('mobile screen sharing', () => {
     });
     expect(MOBILE_SCREEN_SHARE_PUBLISH).toMatchObject({
       videoCodec: 'h264',
-      backupCodec: true,
+      backupCodec: false,
       screenShareEncoding: {
         maxBitrate: 1_500_000,
         maxFramerate: 15,
