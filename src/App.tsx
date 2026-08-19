@@ -15,6 +15,7 @@ export type RootStackParamList = {
     token: string;
     role: 'host' | 'participant';
     meetingNumber: string;
+    hostIdentity?: string;
   };
 };
 

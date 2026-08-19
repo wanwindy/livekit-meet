@@ -1,0 +1,63 @@
+diff --git a/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/GetUserMediaImpl.java b/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/GetUserMediaImpl.java
+--- a/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/GetUserMediaImpl.java
++++ b/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/GetUserMediaImpl.java
+@@ -344,8 +344,9 @@ public class GetUserMediaImpl {
+
+     private VideoTrack createScreenTrack() {
+         DisplayMetrics displayMetrics = DisplayUtils.getDisplayMetrics(reactContext.getCurrentActivity());
+-        int width = displayMetrics.widthPixels;
+-        int height = displayMetrics.heightPixels;
++        int[] dimensions = ScreenCaptureController.getCaptureDimensions(displayMetrics);
++        int width = dimensions[0];
++        int height = dimensions[1];
+         ScreenCaptureController screenCaptureController = new ScreenCaptureController(
+                 reactContext.getCurrentActivity(), width, height, mediaProjectionPermissionResultData);
+         return createVideoTrack(screenCaptureController);
+diff --git a/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/ScreenCaptureController.java b/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/ScreenCaptureController.java
+--- a/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/ScreenCaptureController.java
++++ b/node_modules/@livekit/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/ScreenCaptureController.java
+@@ -17,7 +17,9 @@ public class ScreenCaptureController extends AbstractVideoCaptureController {
+      */
+     private static final String TAG = ScreenCaptureController.class.getSimpleName();
+
+-    private static final int DEFAULT_FPS = 30;
++    private static final int DEFAULT_FPS = 15;
++
++    private static final int MAX_CAPTURE_LONG_EDGE = 1280;
+
+     private final Intent mediaProjectionPermissionResultData;
+
+@@ -39,8 +41,9 @@ public class ScreenCaptureController extends AbstractVideoCaptureController {
+             @Override
+             public void onOrientationChanged(int orientation) {
+                 DisplayMetrics displayMetrics = DisplayUtils.getDisplayMetrics((Activity) context);
+-                final int width = displayMetrics.widthPixels;
+-                final int height = displayMetrics.heightPixels;
++                final int[] dimensions = getCaptureDimensions(displayMetrics);
++                final int width = dimensions[0];
++                final int height = dimensions[1];
+
+                 // Pivot to the executor thread because videoCapturer.changeCaptureFormat runs in the main
+                 // thread and may deadlock.
+@@ -59,6 +62,21 @@ public class ScreenCaptureController extends AbstractVideoCaptureController {
+         }
+     }
+
++    static int[] getCaptureDimensions(DisplayMetrics displayMetrics) {
++        int width = displayMetrics.widthPixels;
++        int height = displayMetrics.heightPixels;
++        int longEdge = Math.max(width, height);
++
++        if (longEdge <= MAX_CAPTURE_LONG_EDGE) {
++            return new int[] {width, height};
++        }
++
++        float scale = (float) MAX_CAPTURE_LONG_EDGE / longEdge;
++        int scaledWidth = Math.max(2, Math.round(width * scale / 2) * 2);
++        int scaledHeight = Math.max(2, Math.round(height * scale / 2) * 2);
++        return new int[] {scaledWidth, scaledHeight};
++    }
++
+     @Override
+     public void dispose() {
+         MediaProjectionService.abort(context);

@@ -9,6 +9,7 @@ export type MeetingTokenResponse = {
   serverUrl: string;
   region?: string;
   token: string;
+  hostIdentity?: string;
 };
 
 type CreateMeetingRequest = {

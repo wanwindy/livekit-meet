@@ -10,7 +10,6 @@ export async function startCallService() {
     importance: 'low',
     vibration: false,
     icon: 'ic_launcher',
-    setOnlyAlertOnce: true,
   });
 }
 export async function stopCallService() {

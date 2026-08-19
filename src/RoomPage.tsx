@@ -34,12 +34,7 @@ import {
   ScreenCapturePickerView,
   mediaDevices,
 } from '@livekit/react-native-webrtc';
-import {
-  ConnectionState,
-  Track,
-  type ScreenShareCaptureOptions,
-  type TrackPublishOptions,
-} from 'livekit-client';
+import {ConnectionState, Track} from 'livekit-client';
 import Toast from 'react-native-toast-message';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {RootStackParamList} from './App';
@@ -52,36 +47,23 @@ import {
 } from './participantPresence';
 import {
   getStageTrackObjectFit,
+  getTrackViewKey,
   getVisibleTracks,
   isRemoteScreenShareTrack,
 } from './roomTracks';
+import {
+  getHostTrackSubscriptionPermissions,
+  MOBILE_SCREEN_SHARE_CAPTURE,
+  MOBILE_SCREEN_SHARE_PUBLISH,
+} from './screenShare';
 
 import 'fastestsmallesttextencoderdecoder';
-
-const HIGH_QUALITY_SCREEN_SHARE_CAPTURE: ScreenShareCaptureOptions = {
-  resolution: {
-    width: 1920,
-    height: 1080,
-    frameRate: 60,
-  },
-  contentHint: 'detail',
-};
-
-const HIGH_QUALITY_SCREEN_SHARE_PUBLISH: TrackPublishOptions = {
-  simulcast: false,
-  videoCodec: 'h264',
-  backupCodec: false,
-  screenShareEncoding: {
-    maxBitrate: 7_000_000,
-    maxFramerate: 60,
-  },
-};
 
 export const RoomPage = ({
   navigation,
   route,
 }: NativeStackScreenProps<RootStackParamList, 'RoomPage'>) => {
-  const {url, token, role, meetingNumber} = route.params;
+  const {url, token, role, meetingNumber, hostIdentity} = route.params;
 
   React.useEffect(() => {
     const start = async () => {
@@ -108,6 +90,7 @@ export const RoomPage = ({
         navigation={navigation}
         role={role}
         meetingNumber={meetingNumber}
+        hostIdentity={hostIdentity}
       />
     </LiveKitRoom>
   );
@@ -117,12 +100,20 @@ type RoomViewProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoomPage'>;
   role: 'host' | 'participant';
   meetingNumber: string;
+  hostIdentity?: string;
 };
 
-const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
+const RoomView = ({
+  navigation,
+  role,
+  meetingNumber,
+  hostIdentity,
+}: RoomViewProps) => {
   const [isCameraFrontFacing, setCameraFrontFacing] = React.useState(true);
   const [servicePromptVisible, setServicePromptVisible] = React.useState(false);
   const [isStartingService, setIsStartingService] = React.useState(false);
+  const [subscriptionPermissionsReady, setSubscriptionPermissionsReady] =
+    React.useState(role !== 'participant');
   const [leavePromptVisible, setLeavePromptVisible] = React.useState(false);
   const autoShareAttemptedRef = React.useRef(false);
   const isStartingServiceRef = React.useRef(false);
@@ -231,25 +222,26 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
     <ScreenCapturePickerView ref={screenCaptureRef} />
   );
 
-  const hostTrackPermissions = React.useMemo(
+  const hostTrackSubscriptionPermissions = React.useMemo(
     () =>
-      remoteParticipants
-        .filter(participant => participant.identity.startsWith('host-'))
-        .map(participant => ({
-          participantIdentity: participant.identity,
-          allowAll: true,
-        })),
-    [remoteParticipants],
+      getHostTrackSubscriptionPermissions({
+        hostIdentity,
+        remoteParticipants,
+      }),
+    [hostIdentity, remoteParticipants],
   );
 
   React.useEffect(() => {
     if (role === 'participant') {
+      const {allParticipantsAllowed, participantTrackPermissions} =
+        hostTrackSubscriptionPermissions;
       localParticipant.setTrackSubscriptionPermissions(
-        false,
-        hostTrackPermissions,
+        allParticipantsAllowed,
+        participantTrackPermissions,
       );
+      setSubscriptionPermissionsReady(true);
     }
-  }, [hostTrackPermissions, localParticipant, role]);
+  }, [hostTrackSubscriptionPermissions, localParticipant, role]);
 
   const startBroadcast = React.useCallback(async () => {
     if (Platform.OS === 'ios') {
@@ -259,8 +251,8 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
 
     await localParticipant.setScreenShareEnabled(
       true,
-      HIGH_QUALITY_SCREEN_SHARE_CAPTURE,
-      HIGH_QUALITY_SCREEN_SHARE_PUBLISH,
+      MOBILE_SCREEN_SHARE_CAPTURE,
+      MOBILE_SCREEN_SHARE_PUBLISH,
     );
   }, [localParticipant]);
 
@@ -379,6 +371,7 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
     if (
       role !== 'participant' ||
       connectionState !== ConnectionState.Connected ||
+      !subscriptionPermissionsReady ||
       isScreenShareEnabled ||
       autoShareAttemptedRef.current
     ) {
@@ -392,6 +385,7 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
     isScreenShareEnabled,
     requestParticipantScreenShare,
     role,
+    subscriptionPermissionsReady,
   ]);
 
   const displayTracks = React.useMemo(
@@ -409,6 +403,7 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
   const stageView =
     visibleTracks.length > 0 ? (
       <ParticipantView
+        key={getTrackViewKey(stageTrack)}
         trackRef={stageTrack}
         style={styles.stage}
         objectFit={getStageTrackObjectFit(stageTrack)}
@@ -434,13 +429,20 @@ const RoomView = ({navigation, role, meetingNumber}: RoomViewProps) => {
 
   const renderParticipant: ListRenderItem<TrackReferenceOrPlaceholder> = ({
     item,
-  }) => <ParticipantView trackRef={item} style={styles.otherParticipantView} />;
+  }) => (
+    <ParticipantView
+      key={getTrackViewKey(item)}
+      trackRef={item}
+      style={styles.otherParticipantView}
+    />
+  );
 
   const otherTracks = visibleTracks.slice(1);
   const otherParticipantsView = !isFullscreenScreenShare &&
     otherTracks.length > 0 && (
       <FlatList
         data={otherTracks}
+        keyExtractor={getTrackViewKey}
         renderItem={renderParticipant}
         horizontal={true}
         style={styles.otherParticipantsList}

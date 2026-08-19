@@ -2,6 +2,7 @@ import {Track} from 'livekit-client';
 import {describe, expect, it} from '@jest/globals';
 import {
   getStageTrackObjectFit,
+  getTrackViewKey,
   getVisibleTracks,
   isRemoteScreenShareTrack,
 } from '../src/roomTracks';
@@ -118,5 +119,16 @@ describe('getVisibleTracks', () => {
         }),
       ),
     ).toBe('cover');
+  });
+
+  it('uses the publication sid to remount a switched native video view', () => {
+    const track = createTrack({
+      source: Track.Source.ScreenShare,
+      isLocal: false,
+      identity: 'guest-1',
+    });
+    track.publication = {trackSid: 'TR_screen'};
+
+    expect(getTrackViewKey(track)).toBe('guest-1-screen_share-TR_screen');
   });
 });

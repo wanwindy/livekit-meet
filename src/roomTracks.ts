@@ -15,6 +15,11 @@ export const getStageTrackObjectFit = (
 ): 'contain' | 'cover' =>
   trackRef?.source === Track.Source.ScreenShare ? 'contain' : 'cover';
 
+export const getTrackViewKey = (trackRef: TrackReferenceOrPlaceholder) =>
+  `${trackRef.participant.identity}-${trackRef.source}-${
+    trackRef.publication?.trackSid ?? 'placeholder'
+  }`;
+
 const getTrackPriority = (
   role: RoomRole,
   trackRef: TrackReferenceOrPlaceholder,
