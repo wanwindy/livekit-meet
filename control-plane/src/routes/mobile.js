@@ -8,6 +8,7 @@ import {badRequest, forbidden, notFound, unauthorized} from '../httpError.js';
 import {
   createMeetingForHost,
   findMeetingByNumber,
+  getHostIdentity,
   issueRoomToken,
   listLiveKitNodes,
 } from '../livekitService.js';
@@ -207,6 +208,7 @@ mobileRouter.post('/meetings/join', async (req, res, next) => {
       serverUrl: meeting.liveKitUrl || meeting.livekitUrl,
       region: meeting.preferredRegion,
       token,
+      hostIdentity: getHostIdentity(meeting.hostAccountId),
     });
   } catch (error) {
     next(error);
@@ -250,5 +252,6 @@ const joinLegacyMeeting = async body => {
     serverUrl: data.serverUrl,
     region: data.region,
     token: data.token,
+    hostIdentity: data.hostIdentity,
   };
 };

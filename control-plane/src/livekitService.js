@@ -10,6 +10,8 @@ const roomNameAlphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
 const createMeetingNumber = customAlphabet(meetingNumberAlphabet, 6);
 const createRoomSuffix = customAlphabet(roomNameAlphabet, 12);
 
+export const getHostIdentity = hostAccountId => `host-${hostAccountId}`;
+
 export const assertLiveKitConfigured = () => {
   if (!config.livekit.apiKey || !config.livekit.apiSecret) {
     throw new HttpError(503, 'LiveKit 签发服务未配置', 'livekit_not_configured');
@@ -128,9 +130,10 @@ export const createMeetingForHost = async ({
       },
     );
 
+    const hostIdentity = getHostIdentity(hostAccount.id);
     const token = await issueRoomToken({
       roomName,
-      identity: `host-${hostAccount.id}`,
+      identity: hostIdentity,
       displayName: displayName || hostAccount.display_name || hostAccount.username,
       role: 'host',
     });
@@ -141,6 +144,7 @@ export const createMeetingForHost = async ({
       serverUrl: node.signalUrl,
       region: selectedRegion,
       token,
+      hostIdentity,
     };
   });
 };
