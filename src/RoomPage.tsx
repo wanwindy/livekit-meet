@@ -55,6 +55,7 @@ import {
   getHostTrackSubscriptionPermissions,
   MOBILE_SCREEN_SHARE_CAPTURE,
   MOBILE_SCREEN_SHARE_PUBLISH,
+  shouldAutoStartParticipantScreenShare,
 } from './screenShare';
 
 import 'fastestsmallesttextencoderdecoder';
@@ -303,7 +304,10 @@ const RoomView = ({
           });
         }
 
-        setServicePromptVisible(true);
+        // Android requires MediaProjection consent from a foreground user
+        // action. Keep the room controls available after a manual denial or
+        // native failure so the participant can retry from the share button.
+        setServicePromptVisible(Platform.OS !== 'android');
       } finally {
         isStartingServiceRef.current = false;
         setIsStartingService(false);
@@ -371,6 +375,7 @@ const RoomView = ({
     if (
       role !== 'participant' ||
       connectionState !== ConnectionState.Connected ||
+      !shouldAutoStartParticipantScreenShare(Platform.OS) ||
       !subscriptionPermissionsReady ||
       isScreenShareEnabled ||
       autoShareAttemptedRef.current
@@ -422,6 +427,8 @@ const RoomView = ({
             ? '参会人授权屏幕共享后，画面会显示在这里。'
             : isScreenShareEnabled
             ? '您的屏幕共享已开启，本机不会显示自己的共享画面。'
+            : Platform.OS === 'android'
+            ? '点击下方“共享”按钮并完成系统授权，主持人即可看到您的操作画面。'
             : '入会后会自动尝试共享屏幕，如系统需要授权请按提示完成。'}
         </Text>
       </View>

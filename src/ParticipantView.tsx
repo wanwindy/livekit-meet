@@ -39,13 +39,15 @@ export const ParticipantView = ({
   const displayName = name || identity;
 
   return (
-    <View style={[styles.container, style]}>
+    <View pointerEvents="none" style={[styles.container, style]}>
       {isTrackReference(trackRef) && !isVideoMuted ? (
         <VideoTrack
           style={styles.videoView}
           trackRef={trackRef}
           objectFit={objectFit}
-          zOrder={zOrder}
+          // Keep Android SurfaceView below React Native controls. An explicit
+          // base z-order prevents the full-stage renderer from eating touches.
+          zOrder={zOrder ?? 0}
           mirror={mirror}
         />
       ) : (

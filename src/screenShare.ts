@@ -22,6 +22,9 @@ export const MOBILE_SCREEN_SHARE_PUBLISH: TrackPublishOptions = {
   },
 };
 
+export const shouldAutoStartParticipantScreenShare = (platform: string) =>
+  platform === 'ios';
+
 export type ParticipantIdentity = {
   identity: string;
 };

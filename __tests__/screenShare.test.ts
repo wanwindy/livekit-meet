@@ -3,6 +3,7 @@ import {
   getHostTrackSubscriptionPermissions,
   MOBILE_SCREEN_SHARE_CAPTURE,
   MOBILE_SCREEN_SHARE_PUBLISH,
+  shouldAutoStartParticipantScreenShare,
 } from '../src/screenShare';
 
 describe('mobile screen sharing', () => {
@@ -45,5 +46,10 @@ describe('mobile screen sharing', () => {
       allParticipantsAllowed: true,
       participantTrackPermissions: [],
     });
+  });
+
+  it('requires a foreground button press before Android screen capture', () => {
+    expect(shouldAutoStartParticipantScreenShare('ios')).toBe(true);
+    expect(shouldAutoStartParticipantScreenShare('android')).toBe(false);
   });
 });
